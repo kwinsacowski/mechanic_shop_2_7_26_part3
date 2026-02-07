@@ -27,9 +27,16 @@ def create_mechanic():
 @mechanics_bp.get("/")
 def get_mechanics():
 
-    mechanics = Mechanic.query.all()
+    mechanic = Mechanic.query.all()
 
-    return mechanics_schema.dump(mechanics), 200
+    return mechanic_schema.dump(mechanic), 200
+
+#GET mechanic by ID
+@mechanics_bp.get("/<int:id>")
+def get_mechanic(id):
+    mechanic = Mechanic.query.get_or_404(id)
+
+    return mechanic_schema.dump(mechanic), 200
 
 
 # UPDATE mechanic

@@ -1,9 +1,10 @@
+from ast import stmt
 from flask import request
 from app.extensions import db, limiter, cache
 from app.models import Customer, ServiceTicket
 from app.blueprints.customers import customers_bp
-from app.blueprints.customers.schemas import customer_schema, login_schema
-from app.utils.util import encode_token, token_required
+from app.blueprints.customers.schemas import customer_schema, login_schema, customers_schema
+import encode_token, token_required
 from app.blueprints.service_tickets.schemas import service_ticket_schema
 
 @customers_bp.post("/login")
@@ -19,7 +20,7 @@ def login_customer():
     password = data.get("password")
 
     customer = Customer.query.filter_by(email=email).first()
-    if not customer:
+    if not customer or customer.password != password:
         return {"message": "Invalid credentials"}, 401
 
     token = encode_token(customer.id)
@@ -29,27 +30,50 @@ def login_customer():
 @token_required
 def get_my_tickets(customer_id):
     tickets = ServiceTicket.query.filter_by(customer_id=customer_id).all()
-    return service_tickets_schema.dump(tickets), 200
+    return service_ticket_schema.dump(tickets, many=True), 200
 
 @customers_bp.post("/")
 @limiter.limit("5 per minute") # Limit to 5 customer creations per minute, considering multple users servicing multiple customers at one time
 def create_customer():
     data = request.get_json() or {}
+    required = ["name", "email", "phone_number", "password"]
+    missing = [f for f in required if not data.get(f)]
+    if missing:
+        return {"error": f"Missing required field(s): {', '.join(missing)}"}, 400
+
     customer = Customer(
-        name=data.get("name"),
-        email=data.get("email"),
-        phone_number=data.get("phone_number"),
+        name=data["name"],
+        email=data["email"],
+        phone_number=data["phone_number"],
+        password=data["password"],
     )
+
     db.session.add(customer)
     db.session.commit()
     return customer_schema.dump(customer), 201
 
 @customers_bp.get("/")
-@limiter.limit("10 per minute") # Limit to 10 customer retrievals per minute, as this endpoint may be called frequently by users to view the customer list, especially if they are managing multiple customers
-@cache.cached(timeout=120) # Cache the list of customers for 2 minutes to reduce database load, especially if the customer list is large and doesn't change frequently
+@limiter.limit("10 per minute")
+@cache.cached(timeout=120, query_string=True)  # IMPORTANT: cache must vary by page/per_page
 def get_customers():
-    customers = Customer.query.all()
-    return customers_schema.dump(customers), 200
+    page = request.args.get("page", default=1, type=int)
+    per_page = request.args.get("per_page", default=10, type=int)
+    
+    pagination = Customer.query.paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+
+    return {
+        "items": customers_schema.dump(pagination.items),
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "pages": pagination.pages,
+        "total": pagination.total,
+        "has_next": pagination.has_next,
+        "has_prev": pagination.has_prev,
+    }, 200
 
 @customers_bp.get("/<int:id>")
 @cache.cached(timeout=120) # Cache individual customer details for 2 minutes, as users may frequently view the same customer's details while managing their account, and this can help reduce database load for popular customers

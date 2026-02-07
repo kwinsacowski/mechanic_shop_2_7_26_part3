@@ -1,4 +1,5 @@
 from app.extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
     #----Models----#
 
 service_mechanics = db.Table('service_mechanics',
@@ -15,6 +16,12 @@ class Customer(db.Model):
     phone_number = db.Column(db.String(20), nullable=False)
     password = db.Column(db.String(128), nullable=False)
 
+    def set_password(self, raw_password: str):
+        self.password = generate_password_hash(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        return check_password_hash(self.password, raw_password)
+
     service_tickets = db.relationship('ServiceTicket', backref='customer', lazy=True)
 
 class ServiceTicket(db.Model):
@@ -25,6 +32,7 @@ class ServiceTicket(db.Model):
     service_date = db.Column(db.Date, nullable=False)
     description = db.Column(db.String(200), nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    pickup_date = db.Column(db.Date, nullable=True)
 
     mechanics = db.relationship('Mechanic', secondary=service_mechanics, backref=db.backref('service_tickets', lazy=True))
 
