@@ -30,9 +30,6 @@ securityDefinitions:
     in: header
     description: "Use: Bearer <token>"
 
-# Default: protected. Override with `security: []` for public endpoints.
-security:
-  - BearerAuth: []
 
 paths:
 
@@ -86,6 +83,11 @@ paths:
             type: array
             items:
               $ref: "#/definitions/CustomerResponse"
+          examples:
+            application/json:
+              - id: 1
+                name: "Jane Doe"
+                email: "jane@email.com"
 
   /customers/{id}:
     get:
@@ -99,88 +101,141 @@ paths:
           description: "Customer found"
           schema:
             $ref: "#/definitions/CustomerResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "Jane Doe"
+              email: "jane@email.com"
         404:
           description: "Not found"
           schema:
             $ref: "#/definitions/ErrorResponse"
+          examples:
+            application/json:
+              message: "Customer not found"
 
+      /customers/{id}:
     put:
       tags: ["Customers"]
-      summary: "Update customer"
-      description: "Update customer fields."
+      summary: "Update a customer"
+      description: "Updates the authenticated customer. Token customer_id must match {id}."
+      security:
+        - BearerAuth: []
       parameters:
-        - $ref: "#/parameters/IdParam"
+        - in: path
+          name: id
+          required: true
+          type: integer
         - in: body
-          name: payload
+          name: body
           required: true
           schema:
             $ref: "#/definitions/CustomerUpdatePayload"
       responses:
-        200:
+        "200":
           description: "Updated customer"
           schema:
             $ref: "#/definitions/CustomerResponse"
-        404:
-          description: "Not found"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
+        "401":
+          description: "Missing/invalid token"
+          examples:
+            application/json:
+              message: "Invalid token"
+        "403":
+          description: "Forbidden (token customer_id != {id})"
+          examples:
+            application/json:
+              message: "Forbidden"
+        "404":
+          description: "Customer not found"
+          examples:
+            application/json:
+              message: "404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again."
 
     delete:
       tags: ["Customers"]
-      summary: "Delete customer"
-      description: "Delete a customer by id."
+      summary: "Delete a customer"
+      description: "Deletes the authenticated customer. Token customer_id must match {id}."
+      security:
+        - BearerAuth: []
       parameters:
-        - $ref: "#/parameters/IdParam"
+        - in: path
+          name: id
+          required: true
+          type: integer
       responses:
-        200:
+        "200":
           description: "Deleted"
-          schema:
-            $ref: "#/definitions/DeleteResponse"
           examples:
             application/json:
-              message: "Customer deleted"
+              message: "Customer 1 deleted"
+        "401":
+          description: "Missing/invalid token"
+          examples:
+            application/json:
+              message: "Authorization header must be 'Bearer <token>'"
+        "403":
+          description: "Forbidden (token customer_id != {id})"
+          examples:
+            application/json:
+              message: "Forbidden"
+        "404":
+          description: "Customer not found"
+          examples:
+            application/json:
+              message: "404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again."
 
-  /customers/login:
+    /customers/login:
     post:
       tags: ["Authentication"]
       summary: "Login customer"
-      description: "Logs in a customer and returns a token (if implemented)."
-      security: []
+      description: "Logs in a customer using email + password and returns a JWT token."
+      security: []   # login must be public
       parameters:
         - in: body
-          name: credentials
+          name: body
           required: true
           schema:
-            $ref: "#/definitions/LoginPayload"
+            $ref: "#/definitions/CustomerLoginPayload"
       responses:
-        200:
-          description: "Token returned"
+        "200":
+          description: "Login successful"
           schema:
             $ref: "#/definitions/LoginResponse"
           examples:
             application/json:
-              token: "eyJhbGciOi..."
-        400:
+              token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          description: "Validation error (schema validation)"
+          examples:
+            application/json:
+              errors:
+                email: ["Missing data for required field."]
+                password: ["Missing data for required field."]
+        "401":
           description: "Invalid credentials"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
+          examples:
+            application/json:
+              message: "Invalid credentials"
 
-  /customers/my-tickets:
+    /customers/my-tickets:
     get:
       tags: ["Customers"]
-      summary: "Get my tickets"
-      description: "Returns tickets for the authenticated customer."
+      summary: "Get my service tickets"
+      description: "Returns all service tickets for the authenticated customer."
+      security:
+        - BearerAuth: []
       responses:
-        200:
-          description: "List of tickets"
+        "200":
+          description: "List of service tickets belonging to the authenticated customer"
           schema:
-            type: array
-            items:
-              $ref: "#/definitions/ServiceTicketResponse"
-        401:
-          description: "Unauthorized"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
+            $ref: "#/definitions/ServiceTicketsListResponse"
+        "401":
+          description: "Missing/invalid token"
+          examples:
+            application/json:
+              message: "Authorization header must be 'Bearer <token>'"
+
 
   # ---------------- Inventory ----------------
 
@@ -200,6 +255,12 @@ paths:
           description: "Created part"
           schema:
             $ref: "#/definitions/InventoryResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "Brake Pad"
+              quantity: 50
+              price: 29.99
 
     get:
       tags: ["Inventory"]
@@ -212,11 +273,18 @@ paths:
             type: array
             items:
               $ref: "#/definitions/InventoryResponse"
+          examples:
+            application/json:
+              - id: 1
+                name: "Brake Pad"
+                quantity: 50
+                price: 29.99
 
   /inventory/{id}:
     get:
       tags: ["Inventory"]
       summary: "Get part"
+      description: "Fetch a single inventory part by id."
       parameters:
         - $ref: "#/parameters/IdParam"
       responses:
@@ -224,10 +292,19 @@ paths:
           description: "Part found"
           schema:
             $ref: "#/definitions/InventoryResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "Brake Pad"
+              quantity: 50
+              price: 29.99
         404:
           description: "Not found"
           schema:
             $ref: "#/definitions/ErrorResponse"
+          examples:
+            application/json: 
+              message: "Inventory part not found"
 
     put:
       tags: ["Inventory"]
@@ -244,10 +321,17 @@ paths:
           description: "Updated part"
           schema:
             $ref: "#/definitions/InventoryResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "Brake Pad - Updated"
+              quantity: 45
+              price: 27.99
 
     delete:
       tags: ["Inventory"]
       summary: "Delete part"
+      description: "Delete an inventory part by id."
       parameters:
         - $ref: "#/parameters/IdParam"
       responses:
@@ -255,6 +339,9 @@ paths:
           description: "Deleted"
           schema:
             $ref: "#/definitions/DeleteResponse"
+          examples:
+            application/json:
+              message: "Inventory part deleted"
 
   # ---------------- Mechanics ----------------
 
@@ -273,10 +360,16 @@ paths:
           description: "Mechanic created"
           schema:
             $ref: "#/definitions/MechanicResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "John Mechanic"
+              email: "john.mechanic@example.com"
 
     get:
       tags: ["Mechanics"]
       summary: "Get mechanics"
+      description: "Returns all mechanics."
       responses:
         200:
           description: "List of mechanics"
@@ -284,11 +377,17 @@ paths:
             type: array
             items:
               $ref: "#/definitions/MechanicResponse"
+          examples:
+            application/json:
+              - id: 1
+                name: "John Mechanic"
+                email: "john.mechanic@example.com"
 
   /mechanics/{id}:
     get:
       tags: ["Mechanics"]
       summary: "Get mechanic"
+      description: "Fetch a single mechanic by id."
       parameters:
         - $ref: "#/parameters/IdParam"
       responses:
@@ -296,6 +395,11 @@ paths:
           description: "Mechanic found"
           schema:
             $ref: "#/definitions/MechanicResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "John Mechanic"
+              email: "john.mechanic@example.com"
 
     put:
       tags: ["Mechanics"]
@@ -312,10 +416,16 @@ paths:
           description: "Updated mechanic"
           schema:
             $ref: "#/definitions/MechanicResponse"
+          examples:
+            application/json:
+              id: 1
+              name: "John M. Mechanic"
+              email: "john.mechanic.updated@example.com"
 
     delete:
       tags: ["Mechanics"]
       summary: "Delete mechanic"
+      description: "Delete a mechanic by id."
       parameters:
         - $ref: "#/parameters/IdParam"
       responses:
@@ -323,6 +433,9 @@ paths:
           description: "Deleted"
           schema:
             $ref: "#/definitions/DeleteResponse"
+          examples:
+            application/json:
+              message: "Mechanic deleted"
 
   /mechanics/leaderboard/most-tickets:
     get:
@@ -336,6 +449,14 @@ paths:
             type: array
             items:
               $ref: "#/definitions/LeaderboardEntry"
+          examples:
+            application/json:
+              - mechanic_id: 1
+                mechanic_name: "John Mechanic"
+                ticket_count: 15
+              - mechanic_id: 2
+                mechanic_name: "Jane Mechanic"
+                ticket_count: 10
 
   # ---------------- Service Tickets ----------------
 
@@ -354,10 +475,18 @@ paths:
           description: "Ticket created"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-07"
+              description: "Oil change"
+              customer_id: 1
 
     get:
       tags: ["Service Tickets"]
       summary: "Get service tickets"
+      description: "Returns all service tickets."
       responses:
         200:
           description: "List of tickets"
@@ -365,6 +494,13 @@ paths:
             type: array
             items:
               $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              - id: 1
+                vin: "1HGCM82633A123456"
+                service_date: "2026-02-07"
+                description: "Oil change"
+                customer_id: 1
 
   /service-tickets/{ticket_id}:
     put:
@@ -382,6 +518,13 @@ paths:
           description: "Ticket updated"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-08"
+              description: "Tire rotation"
+              customer_id: 1
 
   /service-tickets/{ticket_id}/assign-mechanic/{mechanic_id}:
     put:
@@ -395,6 +538,13 @@ paths:
           description: "Mechanic assigned"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-07"
+              description: "Oil change"
+              customer_id: 1
 
   /service-tickets/{ticket_id}/remove-mechanic/{mechanic_id}:
     put:
@@ -408,6 +558,13 @@ paths:
           description: "Mechanic removed"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-07"
+              description: "Oil change"
+              customer_id: 1
 
   /service-tickets/{ticket_id}/edit:
     put:
@@ -426,6 +583,13 @@ paths:
           description: "Ticket mechanics updated"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-07"
+              description: "Oil change"
+              customer_id: 1
 
   /service-tickets/{ticket_id}/add-part/{inventory_id}:
     put:
@@ -439,6 +603,13 @@ paths:
           description: "Part added"
           schema:
             $ref: "#/definitions/ServiceTicketResponse"
+          examples:
+            application/json:
+              id: 1
+              vin: "1HGCM82633A123456"
+              service_date: "2026-02-07"
+              description: "Oil change"
+              customer_id: 1
 
 parameters:
   IdParam:
@@ -467,183 +638,423 @@ parameters:
 
 definitions:
 
-  StatusResponse:
+  # ----------------------------
+  # Common / reusable shapes
+  # ----------------------------
+
+  MessageResponse:
     type: object
     properties:
-      status:
+      message:
         type: string
+        example: "Success"
 
   ErrorResponse:
     type: object
     properties:
       message:
         type: string
+        example: "Validation error"
 
-  DeleteResponse:
+  NotFoundResponse:
     type: object
     properties:
       message:
         type: string
+        example: "Resource not found"
 
-  LoginPayload:
+  # ----------------------------
+  # Auth (Login)
+  # ----------------------------
+
+  CustomerLoginPayload:
     type: object
-    required: ["email"]
+    required: [email, password]
     properties:
       email:
         type: string
+        example: "kayla@example.com"
       password:
         type: string
+        example: "Password123!"
+
+  MechanicLoginPayload:
+    type: object
+    required: [email]
+    properties:
+      email:
+        type: string
+        example: "mechanic@example.com"
 
   LoginResponse:
     type: object
     properties:
       token:
         type: string
+        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzAwMDAwMDAwfQ.abc123"
 
-  CustomerPayload:
+  # ----------------------------
+  # Customers
+  # ----------------------------
+
+  CustomerCreatePayload:
     type: object
-    required: ["name", "email"]
+    required: [name, email, phone_number, password]
     properties:
       name:
         type: string
+        example: "Kayla Salmon"
       email:
         type: string
+        example: "kayla@example.com"
+      phone_number:
+        type: string
+        example: "555-444-7777"
+      password:
+        type: string
+        example: "Password123!"
 
   CustomerUpdatePayload:
     type: object
     properties:
       name:
         type: string
+        example: "Kayla Salmon"
       email:
         type: string
+        example: "kayla@example.com"
+      phone_number:
+        type: string
+        example: "555-444-7777"
+      password:
+        type: string
+        example: "NewPassword123!"
 
   CustomerResponse:
     type: object
     properties:
       id:
         type: integer
+        example: 1
       name:
         type: string
+        example: "Kayla Salmon"
       email:
         type: string
+        example: "kayla@example.com"
+      phone_number:
+        type: string
+        example: "555-444-7777"
 
-  MechanicPayload:
+  CustomersListResponse:
+    type: array
+    items:
+      $ref: "#/definitions/CustomerResponse"
+    example:
+      - id: 1
+        name: "Kayla Salmon"
+        email: "kayla@example.com"
+        phone_number: "555-444-7777"
+      - id: 2
+        name: "Alex Driver"
+        email: "alex@example.com"
+        phone_number: "555-333-1111"
+
+  # ----------------------------
+  # Mechanics
+  # ----------------------------
+
+  MechanicCreatePayload:
     type: object
-    required: ["name", "email"]
+    required: [name, email, phone_number, salary]
     properties:
       name:
         type: string
+        example: "William NotBilliam"
       email:
         type: string
+        example: "mechanic@example.com"
+      phone_number:
+        type: string
+        example: "555-123-4567"
+      salary:
+        type: number
+        format: float
+        example: 65000.0
 
   MechanicUpdatePayload:
     type: object
     properties:
       name:
         type: string
+        example: "William NotBilliam"
       email:
         type: string
+        example: "mechanic@example.com"
+      phone_number:
+        type: string
+        example: "555-123-4567"
+      salary:
+        type: number
+        format: float
+        example: 70000.0
 
   MechanicResponse:
     type: object
     properties:
       id:
         type: integer
+        example: 1
       name:
         type: string
+        example: "William NotBilliam"
       email:
         type: string
+        example: "mechanic@example.com"
+      phone_number:
+        type: string
+        example: "555-123-4567"
+      salary:
+        type: number
+        format: float
+        example: 65000.0
 
-  InventoryPayload:
+  MechanicsListResponse:
+    type: array
+    items:
+      $ref: "#/definitions/MechanicResponse"
+    example:
+      - id: 1
+        name: "William NotBilliam"
+        email: "mechanic@example.com"
+        phone_number: "555-123-4567"
+        salary: 65000.0
+      - id: 2
+        name: "Jane Wrench"
+        email: "jane.wrench@example.com"
+        phone_number: "555-222-3333"
+        salary: 72000.0
+
+  # ----------------------------
+  # Inventory
+  # ----------------------------
+
+  InventoryCreatePayload:
     type: object
-    required: ["name", "quantity", "price"]
+    required: [name, price]
     properties:
       name:
         type: string
-      quantity:
-        type: integer
+        example: "Oil Filter"
       price:
         type: number
         format: float
+        example: 12.99
 
   InventoryUpdatePayload:
     type: object
     properties:
       name:
         type: string
-      quantity:
-        type: integer
+        example: "Oil Filter"
       price:
         type: number
         format: float
+        example: 14.99
 
   InventoryResponse:
     type: object
     properties:
       id:
         type: integer
+        example: 1
       name:
         type: string
-      quantity:
-        type: integer
+        example: "Oil Filter"
       price:
         type: number
         format: float
+        example: 12.99
 
-  ServiceTicketPayload:
+  InventoryListResponse:
+    type: array
+    items:
+      $ref: "#/definitions/InventoryResponse"
+    example:
+      - id: 1
+        name: "Oil Filter"
+        price: 12.99
+      - id: 2
+        name: "Brake Pads"
+        price: 79.99
+
+  # ----------------------------
+  # Service Tickets
+  # ----------------------------
+
+  ServiceTicketCreatePayload:
     type: object
-    required: ["vin", "service_date", "description", "customer_id"]
+    required: [vin, service_date, description, customer_id]
     properties:
       vin:
         type: string
+        example: "1HGCM82633A004352"
       service_date:
         type: string
+        format: date
         example: "2026-02-07"
       description:
         type: string
+        example: "Customer reports squeaking brakes."
       customer_id:
         type: integer
+        example: 1
+      pickup_date:
+        type: string
+        format: date
+        example: "2026-02-10"
 
   ServiceTicketUpdatePayload:
     type: object
     properties:
       vin:
         type: string
+        example: "1HGCM82633A004352"
       service_date:
         type: string
+        format: date
+        example: "2026-02-07"
       description:
         type: string
+        example: "Updated ticket description."
       customer_id:
         type: integer
+        example: 1
+      pickup_date:
+        type: string
+        format: date
+        example: "2026-02-10"
 
-  TicketMechanicsEditPayload:
+  # Small embedded relationship objects used inside ticket responses
+  ServiceTicketCustomerRef:
     type: object
     properties:
-      mechanic_ids:
-        type: array
-        items:
-          type: integer
+      id:
+        type: integer
+        example: 1
+      name:
+        type: string
+        example: "Kayla Salmon"
+      email:
+        type: string
+        example: "kayla@example.com"
+      phone_number:
+        type: string
+        example: "555-444-7777"
+
+  ServiceTicketMechanicRef:
+    type: object
+    properties:
+      id:
+        type: integer
+        example: 1
+      name:
+        type: string
+        example: "William NotBilliam"
+      email:
+        type: string
+        example: "mechanic@example.com"
+      phone_number:
+        type: string
+        example: "555-123-4567"
+      salary:
+        type: number
+        format: float
+        example: 65000.0
+
+  ServiceTicketInventoryRef:
+    type: object
+    properties:
+      id:
+        type: integer
+        example: 1
+      name:
+        type: string
+        example: "Oil Filter"
+      price:
+        type: number
+        format: float
+        example: 12.99
 
   ServiceTicketResponse:
     type: object
     properties:
       id:
         type: integer
+        example: 1
       vin:
         type: string
+        example: "1HGCM82633A004352"
       service_date:
         type: string
+        format: date
+        example: "2026-02-07"
       description:
         type: string
+        example: "Customer reports squeaking brakes."
       customer_id:
         type: integer
-
-  LeaderboardEntry:
-    type: object
-    properties:
-      mechanic_id:
-        type: integer
-      mechanic_name:
+        example: 1
+      pickup_date:
         type: string
-      ticket_count:
-        type: integer
+        format: date
+        example: "2026-02-10"
+
+      # Embedded relationship objects (if your schema returns them)
+      customer:
+        $ref: "#/definitions/ServiceTicketCustomerRef"
+      mechanics:
+        type: array
+        items:
+          $ref: "#/definitions/ServiceTicketMechanicRef"
+        example:
+          - id: 1
+            name: "William NotBilliam"
+            email: "mechanic@example.com"
+            phone_number: "555-123-4567"
+            salary: 65000.0
+      inventory:
+        type: array
+        items:
+          $ref: "#/definitions/ServiceTicketInventoryRef"
+        example:
+          - id: 1
+            name: "Oil Filter"
+            price: 12.99
+
+  ServiceTicketsListResponse:
+    type: array
+    items:
+      $ref: "#/definitions/ServiceTicketResponse"
+    example:
+      - id: 1
+        vin: "1HGCM82633A004352"
+        service_date: "2026-02-07"
+        description: "Customer reports squeaking brakes."
+        customer_id: 1
+        pickup_date: "2026-02-10"
+        customer:
+          id: 1
+          name: "Kayla Salmon"
+          email: "kayla@example.com"
+          phone_number: "555-444-7777"
+        mechanics:
+          - id: 1
+            name: "William NotBilliam"
+            email: "mechanic@example.com"
+            phone_number: "555-123-4567"
+            salary: 65000.0
+        inventory:
+          - id: 1
+            name: "Oil Filter"
+            price: 12.99

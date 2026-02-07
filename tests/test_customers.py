@@ -91,6 +91,9 @@ class TestCustomers(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
         self.assertIn("token", res.json)
+        self.assertIn("token", res.json)
+        self.assertIsInstance(res.json["token"], str)
+        self.assertGreater(len(res.json["token"]), 20)
 
     def test_login_customer_negative_invalid_credentials(self):
         res = self.client.post(
@@ -127,6 +130,8 @@ class TestCustomers(unittest.TestCase):
     def test_get_my_tickets_negative_missing_token(self):
         res = self.client.get("/customers/my-tickets")
         self.assertEqual(res.status_code, 401)
+        data = res.get_json()
+        self.assertEqual(data["message"], "Authorization header must be 'Bearer <token>'")
 
     # PUT /customers/<id>
     def test_update_customer(self):
@@ -157,6 +162,8 @@ class TestCustomers(unittest.TestCase):
             headers=self.auth_headers,
         )
         self.assertIn(res.status_code, (401, 403))
+        data = res.get_json()
+        self.assertEqual(data["message"], "Forbidden")
 
     # DELETE /customers/<id>
     def test_delete_customer(self):
@@ -166,3 +173,13 @@ class TestCustomers(unittest.TestCase):
     def test_delete_customer_negative_missing_token(self):
         res = self.client.delete(f"/customers/{self.customer_id}")
         self.assertEqual(res.status_code, 401)
+
+def test_get_my_tickets_negative_invalid_token(self):
+    response = self.client.get(
+        "/customers/my-tickets",
+        headers={"Authorization": "Bearer invalidtoken123"}
+    )
+
+    self.assertEqual(response.status_code, 401)
+    data = response.get_json()
+    self.assertEqual(data["message"], "Invalid token")

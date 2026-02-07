@@ -209,3 +209,32 @@ class TestServiceTickets(unittest.TestCase):
             f"/service-tickets/{self.ticket_id}/add-part/999999"
         )
         self.assertEqual(res.status_code, 404)
+
+def test_create_service_ticket_negative_bad_date_format(self):
+    payload = {
+        "vin": "1HGCM82633A004352",
+        "service_date": "02-07-2026",  # wrong format
+        "description": "Bad date test",
+        "customer_id": self.customer_id,
+    }
+
+    response = self.client.post("/service-tickets/", json=payload)
+
+    self.assertEqual(response.status_code, 400)
+    data = response.get_json()
+    self.assertEqual(data["error"], "service_date must be in YYYY-MM-DD format")
+
+
+def test_create_service_ticket_negative_customer_not_found(self):
+    payload = {
+        "vin": "1HGCM82633A004352",
+        "service_date": "2026-02-07",
+        "description": "Missing customer test",
+        "customer_id": 999999,
+    }
+
+    response = self.client.post("/service-tickets/", json=payload)
+
+    self.assertEqual(response.status_code, 404)
+    data = response.get_json()
+    self.assertIn("Customer 999999 not found", data["error"])
