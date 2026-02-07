@@ -31,7 +31,7 @@ def login_customer():
 @token_required
 def get_my_tickets(customer_id):
     tickets = ServiceTicket.query.filter_by(customer_id=customer_id).all()
-    return service_tickets_schema.dump(tickets, many=True), 200
+    return service_tickets_schema.dump(tickets), 200
 
 @customers_bp.post("/")
 @limiter.limit("5 per minute") # Limit to 5 customer creations per minute, considering multple users servicing multiple customers at one time
